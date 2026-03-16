@@ -3,283 +3,489 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#09090b" id="theme-color-meta">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
 
 <title>Sim toolkit</title>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+<!-- Modern Fonts and Icons -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
 
 <style>
+/* --- ULTRA-MODERN UI VARIABLES --- */
 :root {
-  --bg: #000000; --surf: #111111; --bord: rgba(255,255,255,0.1);
-  --text: #f4f4f5; --accent: #22c55e; --danger: #ef4444;
+  --bg: #09090b; --surface: rgba(24, 24, 27, 0.65); --surface-solid: #18181b;
+  --surface-hover: #27272a; --border: rgba(255, 255, 255, 0.1); --text: #f4f4f5;
+  --text-muted: #a1a1aa; --accent: #8b5cf6; /* Vibrant Purple for Broadcaster */
+  --primary: #3b82f6; --danger: #ef4444; --success: #10b981; --warn: #f59e0b;
+  --radius: 24px; --radius-sm: 12px; --font: 'Inter', sans-serif;
 }
+
+body.oled-mode { --bg: #000000; --surface-solid: #000000; }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100dvh;overflow:hidden;background:#000;font-family: 'Inter', sans-serif;color:var(--text);}
+html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);font-family:var(--font);color:var(--text);}
+.material-symbols-rounded { font-size: 22px; display: block; }
 
-/* THE BLACKOUT OVERLAY (Total Privacy) */
-#blackout-mode {
-    position: fixed; inset: 0; background: #000; z-index: 9999;
-    display: none; align-items: center; justify-content: center;
+/* BROADCAST CANVAS (FULL SCREEN) */
+#raw-video { display: none; }
+#broadcast-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  z-index: 1; background: #000; will-change: transform;
 }
-
-/* VIDEO PREVIEW BOX (Small & Draggable) */
-#preview-box {
-    position: fixed; top: 50px; left: 20px; z-index: 10;
-    border: 1px solid var(--bord); border-radius: 12px;
-    overflow: hidden; background: #111;
-    transition: width 0.3s, height 0.3s;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+#zoom-badge {
+  position: absolute; top: calc(20px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  background: var(--surface); backdrop-filter: blur(16px); color: var(--accent); font-size: 14px; font-weight: 700;
+  padding: 8px 16px; border-radius: 20px; z-index: 5; opacity: 0; transition: 0.3s; border: 1px solid var(--border);
 }
-#her-video { width: 100%; height: 100%; object-fit: cover; }
-
-/* HUD */
-#hud { position: fixed; inset: 0; z-index: 20; pointer-events: none; transition: opacity 0.3s; }
-#hud.hidden { opacity: 0; visibility: hidden; }
-
-#bar-main {
-    position: absolute; bottom: calc(30px + env(safe-area-inset-bottom));
-    left: 50%; transform: translateX(-50%);
-    background: rgba(20,20,20,0.8); backdrop-filter: blur(20px);
-    padding: 12px 20px; border-radius: 40px; border: 1px solid var(--bord);
-    display: flex; align-items:center; gap: 15px; pointer-events: auto;
-}
-
-.hbtn {
-    width: 50px; height: 50px; border-radius: 50%; border: none;
-    display: flex; align-items:center; justify-content:center;
-    background: #222; color: #fff; cursor: pointer;
-}
-.hbtn.danger { background: var(--danger); }
-.hbtn.active { color: var(--accent); }
 
 /* SETUP SCREEN */
 #setup-screen {
-    position: fixed; inset: 0; z-index: 100; background: #000;
-    display: flex; flex-direction: column; align-items:center; justify-content: center; padding: 20px;
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center;
+  padding: calc(40px + env(safe-area-inset-top)) 16px; background: var(--bg); overflow-y: auto;
 }
-.input-card { width: 100%; max-width: 340px; text-align: center; }
-input { 
-    width: 100%; padding: 15px; background: #111; border: 1px solid #333; 
-    border-radius: 12px; color: #fff; text-align: center; margin-bottom: 15px; font-size: 16px;
-}
-.start-btn { 
-    width: 100%; padding: 15px; background: #fff; color: #000; 
-    border-radius: 12px; font-weight: 700; border: none;
-}
+.card { width: 100%; max-width: 380px; background: var(--surface-solid); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 20px; margin-bottom: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.logo { width: 64px; height: 64px; border-radius: 50%; background: rgba(139, 92, 246, 0.15); display: flex; align-items: center; justify-content: center; color: var(--accent); margin: 0 auto 16px; border: 1px solid rgba(139, 92, 246, 0.3); }
+.logo .material-symbols-rounded { font-size: 32px; }
+.title { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+.sub { font-size: 13px; color: var(--text-muted); text-align: center; margin-bottom: 24px; }
 
-/* SETTINGS */
-#tools-drawer {
-    position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
-    background: #111; border-radius: 20px 20px 0 0; padding: 20px;
-    transform: translateY(100%); transition: 0.4s cubic-bezier(0.32,0.72,0,1);
-}
-#tools-drawer.open { transform: translateY(0); }
-.row { display: flex; align-items:center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #222; }
-.tog { width: 46px; height: 26px; background: #333; border-radius: 13px; position: relative; }
-.tog.on { background: var(--accent); }
-.tog::after { content:''; position:absolute; width:20px; height:20px; background:#fff; border-radius:50%; top:3px; left:3px; transition: 0.2s; }
-.tog.on::after { left: 23px; }
-.slider { width: 100%; height: 6px; background: #333; border-radius: 3px; -webkit-appearance: none; margin-top: 10px; }
-.slider::-webkit-slider-thumb { width: 20px; height: 20px; background: #fff; border-radius: 50%; -webkit-appearance: none; }
+#pulse-ring{width:48px;height:48px;border-radius:50%;border:3px solid var(--accent);margin:0 auto 16px;display:none;animation:wp 1.5s infinite;}
+@keyframes wp{0%{transform:scale(0.8);opacity:0.5}50%{transform:scale(1.2);opacity:1}100%{transform:scale(0.8);opacity:0.5}}
+
+.input-row { display: flex; gap: 8px; width: 100%; align-items: center; margin-bottom: 12px; }
+.input-row input { flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; font-size: 15px; outline: none; text-align: center; font-weight: 600; letter-spacing: 1px; }
+.input-row input:focus { border-color: var(--accent); }
+
+.main-btn { width: 100%; padding: 14px; border-radius: var(--radius-sm); background: var(--accent); color: #fff; font-size: 15px; font-weight: 700; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4); }
+.main-btn:active { transform: scale(0.96); }
+
+.quick-btns { display: flex; gap: 8px; margin-top: 16px; }
+.quick-btns button { flex: 1; height: 48px; background: var(--surface-hover); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); font-weight: 600; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+
+/* HUD / GLASSMORPHISM */
+#hud { position: fixed; inset: 0; z-index: 20; pointer-events: none; transition: 0.4s; }
+#hud.hidden { opacity: 0; visibility: hidden; }
+body.pure-fs #hud { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+
+.badge { position: absolute; background: var(--surface); backdrop-filter: blur(16px); border: 1px solid var(--border); padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+#h-timer { top: calc(20px + env(safe-area-inset-top)); left: 20px; }
+#h-timer .material-symbols-rounded { color: var(--accent); font-size: 16px; }
+#h-qual { top: calc(20px + env(safe-area-inset-top)); right: 20px; pointer-events: auto; cursor: pointer; }
+
+#bar-top { position: absolute; bottom: calc(115px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; gap: 12px; pointer-events: auto; }
+#bar-main { position: absolute; bottom: calc(25px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); background: var(--surface); backdrop-filter: blur(24px); border: 1px solid var(--border); padding: 10px 20px; border-radius: 40px; display: flex; align-items: center; gap: 20px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+
+.hbtn { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; color: var(--text); cursor: pointer; transition: 0.2s; }
+.hbtn .i-bg { width: 48px; height: 48px; border-radius: 50%; background: var(--surface-hover); display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); transition: 0.2s; }
+.hbtn:active .i-bg { transform: scale(0.85); }
+.hbtn.active .i-bg { background: var(--text); color: #000; }
+.hbtn.danger .i-bg { background: var(--danger); color: #fff; border-color: var(--danger); }
+.hbtn.warn .i-bg { background: var(--warn); color: #000; border-color: var(--warn); }
+.hbtn span { font-size: 10px; font-weight: 600; opacity: 0.8; }
+
+.sbtn { width: 46px; height: 46px; border-radius: 50%; background: var(--surface); backdrop-filter: blur(10px); border: 1px solid var(--border); color: #fff; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+.sbtn:active { transform: scale(0.85); }
+
+/* CHAT OVERLAY */
+#chat-ov { position: fixed; inset: 0; z-index: 65; display: none; flex-direction: column; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+#chat-ov.open { display: flex; }
+#chat-inner { margin-top: auto; background: var(--surface-solid); border-radius: 24px 24px 0 0; padding: 20px; display: flex; flex-direction: column; max-height: 70dvh; border-top: 1px solid var(--border); }
+#chat-box { overflow-y: auto; flex: 1; min-height: 150px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+.msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+.msg.me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+.msg.them { align-self: flex-start; background: var(--surface-hover); color: var(--text); border-bottom-left-radius: 4px; }
+.chat-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.chat-input-row input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; padding: 12px 16px; color: var(--text); font-size: 14px; outline: none; }
+.chat-input-row input:focus { border-color: var(--accent); }
+.chat-input-row button { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #fff; border: none; display: flex; align-items: center; justify-content: center; }
+.chat-reacts { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; }
+.chat-reacts button { font-size: 24px; background: none; border: none; cursor: pointer; flex-shrink: 0; transition: 0.2s; }
+.chat-reacts button:active { transform: scale(1.3); }
+
+/* DRAWERS (Settings / Info) */
+.drawer-bg { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: none; opacity: 0; transition: 0.3s; }
+.drawer-bg.show { opacity: 1; }
+.drawer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 71; background: var(--surface-solid); border-radius: 24px 24px 0 0; padding: 0 0 calc(40px + env(safe-area-inset-bottom)); transform: translateY(100%); transition: 0.4s cubic-bezier(0.32,0.72,0,1); max-height: 85dvh; overflow-y: auto; border-top: 1px solid var(--border); }
+.drawer.open { transform: translateY(0); }
+.dhandle { width: 48px; height: 5px; background: var(--surface-hover); border-radius: 3px; margin: 16px auto 12px; }
+.dtitle { text-align: center; font-size: 16px; font-weight: 600; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin: 0 20px 8px; }
+.dsect { padding: 16px 20px 4px; }
+h4.s-head { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.row:last-child { border-bottom: none; }
+.lbl { font-size: 14px; font-weight: 500; }
+.sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+/* Custom Inputs */
+.tog { width: 46px; height: 26px; background: var(--surface-hover); border-radius: 13px; position: relative; transition: 0.3s; border: 1px solid var(--border); }
+.tog.on { background: var(--success); border-color: var(--success); }
+.tog::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.tog.on::after { transform: translateX(20px); }
+.sel { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 13px; font-family: var(--font); }
+.slider { width: 100%; height: 6px; background: var(--surface-hover); border-radius: 3px; -webkit-appearance: none; margin-top: 10px; }
+.slider::-webkit-slider-thumb { width: 20px; height: 20px; background: var(--accent); border-radius: 50%; -webkit-appearance: none; }
+.dbtn { width: 100%; padding: 14px 16px; border-radius: 12px; border: none; font-weight: 600; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; }
+
+/* Audio setup */
+audio { display: none; }
+
+/* TOAST */
+#toast { position: fixed; bottom: calc(120px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 600; z-index: 99999; opacity: 0; transition: 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 8px; pointer-events: none; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
-<body onclick="wakeFromBlackout()">
+<body>
 
-<!-- PRIVACY BLACKOUT -->
-<div id="blackout-mode"></div>
-
-<div id="video-container">
-    <video id="raw-video" autoplay playsinline muted style="display:none"></video>
-    <div id="preview-box" onclick="focusCamera(event)">
-        <video id="her-video" autoplay playsinline muted></video>
-    </div>
-</div>
-
-<div id="setup-screen">
-    <div class="input-card">
-        <span class="material-symbols-rounded" style="font-size: 60px; color: #333; margin-bottom: 10px;">settings_input_antenna</span>
-        <h2 style="margin-bottom: 20px;">Sim Toolkit</h2>
-        <input type="text" id="partner-id" placeholder="Enter Receiver ID">
-        <button class="start-btn" onclick="startBroadcast()">Connect</button>
-        <button onclick="openTools()" style="background:none; border:none; color:#555; margin-top:20px; font-weight:600;">Settings</button>
-    </div>
-</div>
-
-<div id="hud" class="hidden">
-    <div id="bar-main">
-        <button class="hbtn" onclick="toggleBlackout()"><span class="material-symbols-rounded">shield</span></button>
-        <button class="hbtn" id="btn-mic" onclick="toggleMic()"><span class="material-symbols-rounded">mic</span></button>
-        <button class="hbtn" id="btn-spk" onclick="toggleSpk()"><span class="material-symbols-rounded">volume_up</span></button>
-        <button class="hbtn" id="btn-torch" onclick="toggleTorch()"><span class="material-symbols-rounded">flashlight_on</span></button>
-        <button class="hbtn" id="btn-vid" onclick="togglePreview()"><span class="material-symbols-rounded">visibility</span></button>
-        <button class="hbtn" onclick="openTools()"><span class="material-symbols-rounded">settings</span></button>
-        <button class="hbtn danger" onclick="endCall()"><span class="material-symbols-rounded">call_end</span></button>
-    </div>
-</div>
-
-<div id="tools-drawer">
-    <div style="width:40px; height:4px; background:#333; margin:0 auto 15px; border-radius:2px;"></div>
-    <button id="btn-install" style="width:100%; padding:12px; background:#007bff; color:#fff; border:none; border-radius:10px; margin-bottom:15px; display:none;" onclick="installApp()">Install App</button>
-    
-    <div class="row"><span>End Call when out of App</span><div class="tog on" id="tog-bg" onclick="this.classList.toggle('on');saveSettings()"></div></div>
-    <div class="row"><span>Auto-Answer (Off by default)</span><div class="tog" id="tog-auto" onclick="this.classList.toggle('on');saveSettings()"></div></div>
-    
-    <div style="padding:15px 0">
-        <p>Preview Size (<span id="size-val">3</span>)</p>
-        <input type="range" id="sl-size" class="slider" min="1" max="10" value="3" oninput="updateSize(this.value);saveSettings()">
-    </div>
-    
-    <div style="padding:15px 0">
-        <p>HUD Auto-Hide (<span id="hide-val">1</span>s)</p>
-        <input type="range" id="sl-hide" class="slider" min="1" max="5" value="1" oninput="ge('hide-val').innerText=this.value;saveSettings()">
-    </div>
-    
-    <button class="start-btn" style="margin-top:20px; background:#222; color:var(--danger);" onclick="localStorage.clear();location.reload();">Reset App</button>
-</div>
-
+<!-- MEDIA ELEMENTS -->
+<video id="raw-video" autoplay playsinline muted></video>
+<canvas id="broadcast-canvas"></canvas>
+<div id="zoom-badge">1.0×</div>
 <audio id="remote-audio" autoplay playsinline></audio>
 
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="card">
+    <div class="logo"><span class="material-symbols-rounded">podcasts</span></div>
+    <div class="title">Broadcast Studio</div>
+    <div class="sub">Connect and transmit your stream securely.</div>
+    
+    <div id="pulse-ring"></div>
+    <div id="conn-status" style="font-size:13px; color:var(--accent); text-align:center; margin-bottom:16px;">Starting camera...</div>
+    
+    <div class="input-row">
+      <input id="partner-id-input" type="text" placeholder="Enter His Secret ID" autocomplete="off" spellcheck="false">
+    </div>
+    
+    <button class="main-btn" onclick="startCall(); haptic();">
+      <span class="material-symbols-rounded">sensors</span> Start Broadcast
+    </button>
+    
+    <div class="quick-btns">
+      <button onclick="openTools(); haptic();"><span class="material-symbols-rounded">settings</span> Settings</button>
+      <button onclick="runNetTest(); haptic();"><span class="material-symbols-rounded">network_ping</span> Test Net</button>
+    </div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="h-timer" class="badge"><span class="material-symbols-rounded">timer</span> <span id="timer-val">00:00</span></div>
+  <div id="h-qual" class="badge" onclick="openInfo(); haptic();">1080p · 8MB/s</div>
+  
+  <div id="bar-top">
+    <button class="sbtn" id="btn-chat" onclick="openChat(); haptic();"><span class="material-symbols-rounded">chat</span></button>
+    <button class="sbtn" id="btn-flip" onclick="switchCamera(); haptic();"><span class="material-symbols-rounded">flip_camera_ios</span></button>
+    <button class="sbtn" id="btn-torch" onclick="toggleTorch(); haptic();"><span class="material-symbols-rounded">flashlight_on</span></button>
+    <button class="sbtn" id="btn-set" onclick="openTools(); haptic();"><span class="material-symbols-rounded">tune</span></button>
+  </div>
+
+  <div id="bar-main">
+    <button class="hbtn" id="hbtn-mic" onclick="toggleMic(); haptic();">
+      <div class="i-bg"><span class="material-symbols-rounded icon">mic</span></div><span>Mic</span>
+    </button>
+    <button class="hbtn" id="hbtn-spk" onclick="toggleSpeaker(); haptic();">
+      <div class="i-bg"><span class="material-symbols-rounded icon">volume_up</span></div><span>Speaker</span>
+    </button>
+    <button class="hbtn danger" onclick="hangUp(); haptic();">
+      <div class="i-bg"><span class="material-symbols-rounded">call_end</span></div><span>End</span>
+    </button>
+    <button class="hbtn warn" id="hbtn-scramble" onclick="toggleScramble(); haptic();">
+      <div class="i-bg"><span class="material-symbols-rounded icon">block</span></div><span>Scramble</span>
+    </button>
+  </div>
+</div>
+
+<!-- CHAT OVERLAY -->
+<div id="chat-ov">
+  <div style="flex:1" onclick="closeChat()"></div>
+  <div id="chat-inner">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="font-weight:700;font-size:16px;">Messages</span>
+      <button onclick="closeChat(); haptic();" style="background:var(--surface-hover);border:none;border-radius:50%;width:30px;height:30px;color:#fff;"><span class="material-symbols-rounded" style="font-size:18px;margin:auto;">close</span></button>
+    </div>
+    <div id="chat-box"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button onclick="sendChat(); haptic();"><span class="material-symbols-rounded">send</span></button>
+    </div>
+    <div class="chat-reacts">
+      <button onclick="sendReaction('❤️'); haptic();">❤️</button>
+      <button onclick="sendReaction('👍'); haptic();">👍</button>
+      <button onclick="sendReaction('😘'); haptic();">😘</button>
+      <button onclick="sendReaction('🔥'); haptic();">🔥</button>
+      <button onclick="sendReaction('📞'); haptic();">📞</button>
+      <button onclick="sendReaction('✅'); haptic();">✅</button>
+      <button onclick="sendReaction('🤫'); haptic();">🤫</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS DRAWER -->
+<div class="drawer-bg" id="tools-bg" onclick="history.back()"></div>
+<div class="drawer" id="tools-drawer">
+  <div class="dhandle"></div>
+  <div class="dtitle">Studio Settings</div>
+  
+  <div class="dsect">
+    <!-- PWA Install -->
+    <button id="btn-install" class="dbtn" style="background:var(--primary); color:#fff; display:none;" onclick="installPWA(); haptic();"><span class="material-symbols-rounded">download</span> Install App</button>
+
+    <h4 class="s-head">📡 Transmission Quality</h4>
+    <div class="row">
+      <div><div class="lbl">Resolution</div><div class="sub">Camera capture size</div></div>
+      <select class="sel" id="sel-qual" onchange="initCamera(); saveSettings(); haptic();">
+        <option value="4k">4K Ultra HD</option>
+        <option value="hd" selected>1080p Full HD</option>
+        <option value="720">720p HD</option>
+        <option value="480">480p SD</option>
+      </select>
+    </div>
+    <div class="row">
+      <div><div class="lbl">Max Bitrate</div><div class="sub">Bandwidth limit</div></div>
+      <select class="sel" id="sel-bit" onchange="updateQualBadge(); saveSettings(); haptic();">
+        <option value="1048576">1 MB/s</option>
+        <option value="4194304">4 MB/s</option>
+        <option value="8388608" selected>8 MB/s</option>
+        <option value="15728640">15 MB/s</option>
+        <option value="25165824">25 MB/s (Max)</option>
+      </select>
+    </div>
+    <div class="row">
+      <div><div class="lbl">Framerate</div></div>
+      <select class="sel" id="sel-fps" onchange="initCamera(); saveSettings(); haptic();">
+        <option value="60">60 FPS</option>
+        <option value="30" selected>30 FPS</option>
+        <option value="24">24 FPS</option>
+        <option value="15">15 FPS</option>
+      </select>
+    </div>
+
+    <h4 class="s-head" style="margin-top:24px;">🎨 Studio Filters</h4>
+    <div class="row"><div><div class="lbl">Mirror Camera</div><div class="sub">Flip preview like a mirror</div></div><div class="tog on" id="tog-mir" onclick="this.classList.toggle('on'); saveSettings(); haptic();"></div></div>
+    <div class="row"><div><div class="lbl">Beauty Smooth</div></div><div class="tog" id="tog-bea" onclick="this.classList.toggle('on'); saveSettings(); haptic();"></div></div>
+    <div class="row"><div><div class="lbl">Night Mode Brighten</div></div><div class="tog" id="tog-nig" onclick="this.classList.toggle('on'); saveSettings(); haptic();"></div></div>
+    <div style="padding:10px 0;">
+      <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:500;"><span>Brightness</span><span id="b-val" style="color:var(--accent)">100%</span></div>
+      <input type="range" class="slider" id="sl-b" min="50" max="180" value="100" oninput="ge('b-val').innerText=this.value+'%'; saveSettings();">
+    </div>
+
+    <h4 class="s-head" style="margin-top:24px;">✨ Automation & UI</h4>
+    <div class="row"><div><div class="lbl">Triple-Tap Pure Fullscreen</div></div><div class="tog on" id="tog-fs" onclick="this.classList.toggle('on'); saveSettings(); haptic();"></div></div>
+    <div class="row"><div><div class="lbl">Auto-Hide Controls</div></div><div class="tog on" id="tog-ah" onclick="this.classList.toggle('on'); saveSettings(); haptic();"></div></div>
+    <div class="row"><div><div class="lbl">OLED Pure Black</div></div><div class="tog" id="tog-oled" onclick="this.classList.toggle('on'); saveSettings(); haptic();"></div></div>
+    <div class="row"><div><div class="lbl">Keep Screen On</div></div><div class="tog on" id="tog-wake" onclick="this.classList.toggle('on'); saveSettings(); haptic();"></div></div>
+  </div>
+</div>
+
+<div class="drawer-bg" id="info-bg" onclick="history.back()"></div>
+<div class="drawer" id="info-drawer">
+  <div class="dhandle"></div>
+  <div class="dtitle">Live Stream Info</div>
+  <div class="dsect">
+    <div class="row"><span class="lbl">Broadcast Status</span><span id="i-stat" style="font-weight:700;color:var(--success)">Live</span></div>
+    <div class="row"><span class="lbl">Resolution Sent</span><span id="i-res" style="font-weight:700;">--</span></div>
+    <div class="row"><span class="lbl">Bitrate Target</span><span id="i-bit" style="font-weight:700;">--</span></div>
+    <div class="row"><span class="lbl">Ping (Latency)</span><span id="i-ping" style="font-weight:700;">--</span></div>
+  </div>
+</div>
+
+<div id="toast"><span class="material-symbols-rounded" id="toast-icon">info</span> <span id="toast-msg"></span></div>
+
 <script>
-if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
-
+// --- PWA SETUP ---
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js'); }
 let defP;
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); defP = e; ge('btn-install').style.display = 'block'; });
-async function installApp() { if(!defP) return; defP.prompt(); defP = null; }
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); defP = e; ge('btn-install').style.display = 'flex'; });
+async function installPWA() { if(!defP) return; defP.prompt(); const { outcome } = await defP.userChoice; if(outcome === 'accepted') ge('btn-install').style.display = 'none'; defP = null; }
 
+// --- UTILS ---
 const ge = id => document.getElementById(id);
 const haptic = () => navigator.vibrate?.(15);
+let _tt; const showToast = (msg, icon='info') => { const t=ge('toast'); ge('toast-msg').innerText=msg; ge('toast-icon').innerText=icon; t.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'), 2500); };
+const tog = id => ge(id).classList.contains('on');
+const st = (id, on) => on ? ge(id).classList.add('on') : ge(id).classList.remove('on');
 
-// SETTINGS
+// --- SETTINGS ---
+const S_KEY = 'broadcaster_v1';
 const saveSettings = () => {
-    localStorage.setItem('she_v3', JSON.stringify({
-        bg: ge('tog-bg').classList.contains('on'),
-        auto: ge('tog-auto').classList.contains('on'),
-        size: ge('sl-size').value,
-        hide: ge('sl-hide').value
-    }));
-    updateSize(ge('sl-size').value);
+  localStorage.setItem(S_KEY, JSON.stringify({
+    qual: ge('sel-qual').value, bit: ge('sel-bit').value, fps: ge('sel-fps').value,
+    mir: tog('tog-mir'), bea: tog('tog-bea'), nig: tog('tog-nig'), b: ge('sl-b').value,
+    fs: tog('tog-fs'), ah: tog('tog-ah'), oled: tog('tog-oled'), wake: tog('tog-wake'),
+    partner: ge('partner-id-input').value
+  }));
+  applyUI();
 };
-
 const loadSettings = () => {
-    const s = JSON.parse(localStorage.getItem('she_v3') || '{}');
-    if(s.bg === false) ge('tog-bg').classList.remove('on');
-    if(s.auto) ge('tog-auto').classList.add('on');
-    if(s.size) { ge('sl-size').value = s.size; updateSize(s.size); }
-    if(s.hide) { ge('sl-hide').value = s.hide; ge('hide-val').innerText = s.hide; }
+  const s = JSON.parse(localStorage.getItem(S_KEY) || '{}');
+  if(s.qual) ge('sel-qual').value = s.qual; if(s.bit) ge('sel-bit').value = s.bit; if(s.fps) ge('sel-fps').value = s.fps;
+  if(s.b) { ge('sl-b').value = s.b; ge('b-val').innerText = s.b+'%'; }
+  if(s.partner) ge('partner-id-input').value = s.partner;
+  st('tog-mir', s.mir !== false); st('tog-bea', !!s.bea); st('tog-nig', !!s.nig);
+  st('tog-fs', s.fs !== false); st('tog-ah', s.ah !== false); st('tog-oled', !!s.oled); st('tog-wake', s.wake !== false);
+  applyUI(); updateQualBadge();
 };
+const applyUI = () => { document.body.classList.toggle('oled-mode', tog('tog-oled')); };
 
-const updateSize = v => {
-    ge('size-val').innerText = v;
-    const box = ge('preview-box');
-    box.style.width = (v * 30) + "px";
-    box.style.height = (v * 40) + "px";
-};
+// --- WEBRTC & PEER ---
+let peer = new Peer(undefined, { config: { iceServers:[{urls: 'stun:stun.l.google.com:19302'}] } });
+let currentCall = null, dataConn = null, myId = '';
+let unread = 0;
 
-// BACKGROUND HANDLING
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden && ge('tog-bg').classList.contains('on')) {
-        endCall();
-    }
-});
+peer.on('open', id => { myId = id; ge('conn-status').innerText = 'Ready. Enter his ID and start.'; });
+peer.on('error', err => ge('conn-status').innerText = 'Error: ' + err.type);
 
-// CALL LOGIC
-let peer = new Peer();
-let currentCall, localStream, videoTrack;
+const startCall = () => {
+  const pid = ge('partner-id-input').value.trim();
+  if(!pid) return showToast('Enter Partner ID', 'warning');
+  if(!videoTrack) return showToast('Camera starting...', 'videocam');
+  
+  saveSettings();
+  ge('conn-status').innerText = 'Calling...'; ge('pulse-ring').style.display = 'block';
+  
+  // Data connection for chat
+  dataConn = peer.connect(pid);
+  dataConn.on('data', d => receiveChat(d));
 
-async function startBroadcast() {
-    const id = ge('partner-id').value;
-    if(!id) return alert("Enter ID");
-
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment", width: 1280, height: 720 },
-            audio: { sampleRate: 48000, echoCancellation: false }
-        });
-        videoTrack = localStream.getVideoTracks()[0];
-        ge('her-video').srcObject = localStream;
-        
-        currentCall = peer.call(id, localStream);
-        setupCallHandlers(currentCall);
-    } catch(e) { alert("Camera failed. Check permissions."); }
-}
-
-function setupCallHandlers(call) {
-    call.on('stream', rs => {
-        ge('remote-audio').srcObject = rs;
-        ge('setup-screen').style.display = 'none';
-        showHudTemp();
-    });
-    call.on('close', () => location.reload());
-}
-
-// HUD & PRIVACY
-let hudTo;
-const showHudTemp = () => {
+  // Call connection for stream
+  currentCall = peer.call(pid, getBroadcastStream());
+  currentCall.on('stream', rs => {
+    ge('remote-audio').srcObject = rs;
+    ge('setup-screen').style.display = 'none';
     ge('hud').classList.remove('hidden');
-    clearTimeout(hudTo);
-    hudTo = setTimeout(() => {
-        ge('hud').classList.add('hidden');
-    }, ge('sl-hide').value * 1000);
+    applyWakeLock(); startTimer(); startStats(); applyBitrate(); showHudTemp();
+    showToast('On Air', 'podcasts');
+  });
+  currentCall.on('close', () => { location.reload(); });
 };
 
-// If user clicks screen, show HUD
-document.body.addEventListener('touchstart', showHudTemp);
+const hangUp = () => location.reload();
 
-function toggleBlackout() {
-    ge('blackout-mode').style.display = 'flex';
-}
-function wakeFromBlackout() {
-    ge('blackout-mode').style.display = 'none';
-    showHudTemp();
-}
+// --- HARDWARE CAMERA & CANVAS PIPELINE ---
+let rawVid = ge('raw-video'), cvs = ge('broadcast-canvas'), ctx = cvs.getContext('2d');
+let videoTrack, audioTrack, canvasStream, usingFront = true, cRaf;
+const RES = { '4k':{w:3840,h:2160}, 'hd':{w:1920,h:1080}, '720':{w:1280,h:720}, '480':{w:854,h:480} };
 
-function togglePreview() {
-    const box = ge('preview-box');
-    box.style.display = box.style.display === 'none' ? 'block' : 'none';
-    ge('btn-vid').classList.toggle('active');
-}
+const initCamera = async () => {
+  if(videoTrack) videoTrack.stop(); if(audioTrack) audioTrack.stop();
+  const r = RES[ge('sel-qual').value]; const f = parseInt(ge('sel-fps').value);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width:{ideal: r.w}, height:{ideal: r.h}, frameRate:{ideal: f}, facingMode: usingFront ? 'user' : 'environment' },
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 }
+    });
+    rawVid.srcObject = stream; videoTrack = stream.getVideoTracks()[0]; audioTrack = stream.getAudioTracks()[0];
+    
+    // Setup Canvas Stream for transmission
+    if(!canvasStream) {
+      canvasStream = cvs.captureStream(f);
+      renderLoop();
+    }
+    // Update live track if already in call
+    if(currentCall) {
+      const sender = currentCall.peerConnection.getSenders().find(s => s.track.kind === 'video');
+      if(sender) sender.replaceTrack(canvasStream.getVideoTracks()[0]);
+    }
+  } catch(e) { showToast('Camera Auth Failed', 'error'); }
+};
 
-function toggleMic() {
-    localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled;
-    ge('btn-mic').classList.toggle('active');
-}
+const switchCamera = () => { usingFront = !usingFront; initCamera(); showToast('Camera Flipped', 'flip_camera_ios'); };
 
-function toggleSpk() {
-    ge('remote-audio').muted = !ge('remote-audio').muted;
-    ge('btn-spk').classList.toggle('active');
-}
+let torchOn = false;
+const toggleTorch = async () => {
+  if(!videoTrack) return;
+  try { torchOn = !torchOn; await videoTrack.applyConstraints({advanced:[{torch: torchOn}]}); ge('btn-torch').classList.toggle('active', torchOn); } 
+  catch(e) { showToast('Torch not supported', 'flashlight_off'); torchOn = false; }
+};
 
-async function toggleTorch() {
-    if(!videoTrack) return;
-    const props = videoTrack.getConstraints();
-    const torch = !videoTrack.getSettings().torch;
-    await videoTrack.applyConstraints({ advanced: [{ torch: torch }] });
-    ge('btn-torch').classList.toggle('active', torch);
-}
+// Canvas Drawing Engine (Bakes zoom & filters into the stream!)
+const renderLoop = () => {
+  cRaf = requestAnimationFrame(renderLoop);
+  if(!rawVid.videoWidth) return;
+  
+  // Set true transmission resolution
+  if(cvs.width !== rawVid.videoWidth) { cvs.width = rawVid.videoWidth; cvs.height = rawVid.videoHeight; }
+  
+  const cw = cvs.width, ch = cvs.height;
+  const sw = cw / currentZoom, sh = ch / currentZoom;
+  const sx = (cw - sw) / 2, sy = (ch - sh) / 2;
 
-function focusCamera(e) {
-    if(!videoTrack) return;
-    haptic();
-    // Native Android Focus call (where supported)
-    videoTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(()=>{});
-}
+  let filt = `brightness(${ge('sl-b').value / 100})`;
+  if(tog('tog-nig')) filt += ' contrast(1.3) saturate(0.8)';
+  if(tog('tog-bea')) filt += ' contrast(0.95) saturate(1.1) blur(1px)';
+  
+  ctx.filter = filt;
+  ctx.save();
+  if(tog('tog-mir') && usingFront) { ctx.translate(cw, 0); ctx.scale(-1, 1); } // Mirroring
+  ctx.drawImage(rawVid, sx, sy, sw, sh, 0, 0, cw, ch);
+  ctx.restore();
+};
 
-function endCall() { location.reload(); }
-function openTools() { ge('tools-drawer').classList.add('open'); }
-function closeTools() { ge('tools-drawer').classList.remove('open'); }
+const getBroadcastStream = () => {
+  const tracks = canvasStream.getVideoTracks();
+  if(audioTrack) tracks.unshift(audioTrack);
+  return new MediaStream(tracks);
+};
 
-// Handle Android Back Gesture
-window.addEventListener('popstate', closeTools);
-document.body.addEventListener('click', e => {
-    if(e.target.id === 'tools-drawer' || e.target.closest('#tools-drawer')) return;
-    closeTools();
+// --- FLUID PINCH TO ZOOM ---
+let currentZoom = 1.0, startDist = 0, startZoom = 1.0, isPinching = false;
+cvs.addEventListener('touchstart', e => { if(e.touches.length==2){ isPinching = true; startDist = Math.hypot(e.touches[0].pageX-e.touches[1].pageX, e.touches[0].pageY-e.touches[1].pageY); startZoom = currentZoom; } }, {passive:false});
+cvs.addEventListener('touchmove', e => {
+  if(e.touches.length==2){
+    e.preventDefault(); const d = Math.hypot(e.touches[0].pageX-e.touches[1].pageX, e.touches[0].pageY-e.touches[1].pageY);
+    currentZoom = Math.min(Math.max(1.0, startZoom * (d/startDist)), 7.0);
+    ge('zoom-badge').innerText = currentZoom.toFixed(1)+'×'; ge('zoom-badge').style.opacity = 1; clearTimeout(_tt); _tt=setTimeout(()=>ge('zoom-badge').style.opacity=0, 1000);
+  }
+}, {passive:false});
+cvs.addEventListener('touchend', e => { if(e.touches.length<2) setTimeout(()=>isPinching=false, 100); });
+
+let taps = 0, hTo;
+cvs.addEventListener('pointerup', e => {
+  if(isPinching || e.target.closest('button')) return;
+  taps++;
+  if(taps==1) setTimeout(()=>{ if(taps==1){ if(ge('hud').classList.contains('hidden')) showHudTemp(); else ge('hud').classList.add('hidden'); } taps=0; },250);
+  else if(taps==3) { if(tog('tog-fs')){ if(!document.fullscreenElement) { document.documentElement.requestFullscreen(); document.body.classList.add('pure-fs'); } else document.exitFullscreen(); } taps=0; }
 });
+document.onfullscreenchange = () => { if(!document.fullscreenElement) document.body.classList.remove('pure-fs'); };
+
+const showHudTemp = () => { ge('hud').classList.remove('hidden'); clearTimeout(hTo); if(tog('tog-ah')) hTo = setTimeout(()=>ge('hud').classList.add('hidden'), 4000); };
+
+// --- HUD CONTROLS ---
+let micMuted = false, spkMuted = false, isScrambled = false;
+const toggleMic = () => { micMuted = !micMuted; if(audioTrack) audioTrack.enabled = !micMuted; ge('hbtn-mic').classList.toggle('active', micMuted); ge('hbtn-mic').querySelector('.icon').innerText = micMuted?'mic_off':'mic'; showToast(micMuted?'Mic Muted':'Mic Live'); };
+const toggleSpeaker = () => { spkMuted = !spkMuted; ge('remote-audio').muted = spkMuted; ge('hbtn-spk').classList.toggle('active', spkMuted); ge('hbtn-spk').querySelector('.icon').innerText = spkMuted?'volume_off':'volume_up'; showToast(spkMuted?'Speaker Muted':'Speaker On'); };
+const toggleScramble = () => { isScrambled = !isScrambled; if(videoTrack) videoTrack.enabled = !isScrambled; if(audioTrack) audioTrack.enabled = !isScrambled; ge('hbtn-scramble').classList.toggle('active', isScrambled); showToast(isScrambled?'Stream Scrambled!':'Stream Restored', isScrambled?'block':'check_circle'); };
+
+// --- CHAT SYSTEM ---
+const openChat = () => { unread = 0; updateChatBadge(); ge('chat-ov').classList.add('open'); };
+const closeChat = () => { ge('chat-ov').classList.remove('open'); };
+const sendChat = () => { const i = ge('chat-input'); const v = i.value.trim(); if(!v) return; i.value=''; drawChat(v, 'me'); if(dataConn) dataConn.send(v); };
+const sendReaction = (em) => { drawChat(em, 'me'); if(dataConn) dataConn.send(em); };
+const receiveChat = (msg) => { drawChat(msg, 'them'); if(!ge('chat-ov').classList.contains('open')) { unread++; updateChatBadge(); showToast('New message', 'chat'); } haptic(); };
+const drawChat = (msg, who) => { const b = ge('chat-box'); const d = document.createElement('div'); d.className = 'msg '+who; d.innerText = msg; b.appendChild(d); b.scrollTop = b.scrollHeight; };
+const updateChatBadge = () => { ge('btn-chat').style.color = unread > 0 ? var('--accent') : '#fff'; };
+
+// --- BITRATE & STATS ---
+const updateQualBadge = () => { const bps = ge('sel-bit').value; const mb = (bps/1048576).toFixed(0); ge('h-qual').innerText = `${ge('sel-qual').options[ge('sel-qual').selectedIndex].text.split(' ')[0]} · ${mb}MB/s`; ge('i-bit').innerText = `${mb} MB/s`; };
+const applyBitrate = () => { if(!currentCall) return; const bps = parseInt(ge('sel-bit').value); currentCall.peerConnection.getSenders().forEach(s => { if(s.track && s.track.kind==='video'){ const p = s.getParameters(); if(!p.encodings) p.encodings=[{}]; p.encodings.forEach(e => { e.maxBitrate = bps; }); s.setParameters(p).catch(()=>{}); } }); };
+let cTime; const startTimer = () => { cTime = Date.now(); setInterval(() => { const s = Math.floor((Date.now()-cTime)/1000); ge('timer-val').innerText = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }, 1000); };
+const startStats = () => { setInterval(async () => { if(!currentCall) return; const stats = await currentCall.peerConnection.getStats(); stats.forEach(r => { if(r.type==='candidate-pair' && r.state==='succeeded') ge('i-ping').innerText = (r.currentRoundTripTime*1000).toFixed(0)+' ms'; if(r.type==='outbound-rtp' && r.kind==='video' && r.frameWidth) ge('i-res').innerText = `${r.frameWidth}x${r.frameHeight}`; }); }, 3000); };
+
+// --- DRAWERS & HELPERS ---
+window.addEventListener('popstate', () => { ge('tools-drawer').classList.remove('open'); ge('info-drawer').classList.remove('open'); document.querySelectorAll('.drawer-bg').forEach(e => { e.classList.remove('show'); setTimeout(()=>e.style.display='none',300); }); });
+const openDrawer = (bg, dr) => { history.pushState({o:1},''); ge(bg).style.display='block'; ge(dr).classList.add('open'); setTimeout(()=>ge(bg).classList.add('show'), 10); };
+const openTools = () => openDrawer('tools-bg', 'tools-drawer');
+const openInfo = () => openDrawer('info-bg', 'info-drawer');
+const applyWakeLock = async () => { if(tog('tog-wake') && 'wakeLock' in navigator) try { await navigator.wakeLock.request('screen'); } catch(e){} };
 
 loadSettings();
+initCamera();
 </script>
 </body>
 </html>
