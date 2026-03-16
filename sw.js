@@ -1,20 +1,7 @@
-const CACHE_NAME = 'Sim toolkit-v2';
-
+const CACHE_NAME = 'sim-toolkit-v3';
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll([
-        './index.html',
-        './manifest.json',
-        './icon.png'
-      ]);
-    })
-  );
-  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./index.html', './manifest.json', './icon.png'])));
 });
-
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
-  );
+self.addEventListener('fetch', (e) => {
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
