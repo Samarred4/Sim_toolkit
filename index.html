@@ -121,12 +121,14 @@ h4.s-head { font-size: 12px; color: var(--text-muted); text-transform: uppercase
 .tog::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 .tog.on::after { transform: translateX(20px); }
 .sel { background: #000; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 13px; font-family: var(--font); outline: none;}
+.num-input { width: 80px; background: #000; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 14px; text-align: center; outline: none; font-family: var(--font); font-weight: 600; }
+.num-input:focus { border-color: var(--accent); }
 .slider { width: 100%; height: 6px; background: var(--surface-hover); border-radius: 3px; -webkit-appearance: none; margin-top: 10px; }
 .slider::-webkit-slider-thumb { width: 20px; height: 20px; background: var(--accent); border-radius: 50%; -webkit-appearance: none; }
 .dbtn { width: 100%; padding: 14px 16px; border-radius: 12px; border: none; font-weight: 600; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; }
 
 audio { display: none; }
-#toast { position: fixed; bottom: calc(150px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: #000; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 600; z-index: 99999; opacity: 0; transition: 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 8px; pointer-events: none; }
+#toast { position: fixed; bottom: calc(180px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: #000; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 600; z-index: 99999; opacity: 0; transition: 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 8px; pointer-events: none; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
@@ -220,6 +222,16 @@ audio { display: none; }
       </select>
     </div>
 
+    <h4 class="s-head" style="margin-top:24px;">📡 Bandwidth Limits</h4>
+    <div class="row">
+      <div><div class="lbl">Min Bitrate (kbps)</div><div class="sub">Hard floor for video quality</div></div>
+      <input type="number" id="inp-min-kbps" class="num-input" value="4000" inputmode="numeric" onchange="saveSettings(); haptic();">
+    </div>
+    <div class="row">
+      <div><div class="lbl">Max Bitrate (kbps)</div><div class="sub">Maximum allowed bandwidth</div></div>
+      <input type="number" id="inp-max-kbps" class="num-input" value="8000" inputmode="numeric" onchange="saveSettings(); haptic();">
+    </div>
+
     <h4 class="s-head" style="margin-top:24px;">🎙️ Advanced Audio</h4>
     <div class="row">
       <div><div class="lbl">Echo Cancellation</div><div class="sub">Turn on if he hears an echo</div></div>
@@ -264,12 +276,13 @@ const tog = id => ge(id).classList.contains('on');
 const st = (id, on) => on ? ge(id).classList.add('on') : ge(id).classList.remove('on');
 
 // --- SETTINGS STORAGE ---
-const S_KEY = 'broadcaster_v3';
+const S_KEY = 'broadcaster_v5';
 const saveSettings = () => {
   localStorage.setItem(S_KEY, JSON.stringify({
     bgHang: tog('tog-bg-hangup'), wake: tog('tog-wake'),
     echo: tog('tog-echo'), noise: tog('tog-noise'), gain: tog('tog-gain'),
     cam: ge('sel-cam').value, res: ge('sel-res').value, 
+    minKbps: ge('inp-min-kbps').value, maxKbps: ge('inp-max-kbps').value,
     prevSize: ge('sl-prev-size').value, ahSec: ge('sl-ah-sec').value,
     partner: ge('partner-id-input').value
   }));
@@ -280,6 +293,8 @@ const loadSettings = () => {
   if(s.partner) ge('partner-id-input').value = s.partner;
   if(s.cam) ge('sel-cam').value = s.cam;
   if(s.res) ge('sel-res').value = s.res;
+  if(s.minKbps) ge('inp-min-kbps').value = s.minKbps;
+  if(s.maxKbps) ge('inp-max-kbps').value = s.maxKbps;
   if(s.prevSize) { ge('sl-prev-size').value = s.prevSize; applyPreviewSize(); }
   if(s.ahSec) { ge('sl-ah-sec').value = s.ahSec; ge('ah-val').innerText = s.ahSec+'s'; }
   
@@ -298,9 +313,13 @@ const applyPreviewSize = () => {
   ge('preview-wrap').style.width = `${calcWidth}vw`;
 };
 
-// --- SDP MUNGER ---
+// --- DYNAMIC SDP MUNGER ---
 function forceSDPBitrates(sdpText) {
-    const minKbps = 1000; const maxKbps = 8000; const startKbps = maxKbps;
+    // Pull dynamically from the input fields in settings
+    const minKbps = parseInt(ge('inp-min-kbps').value) || 4000; 
+    const maxKbps = parseInt(ge('inp-max-kbps').value) || 8000; 
+    const startKbps = maxKbps;
+    
     const lines = sdpText.split('\r\n');
     const mungedLines = [];
     let isVideoSection = false;
